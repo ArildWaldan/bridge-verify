@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bridge Verify</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: var(--tg-theme-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #000000);
+            --hint: var(--tg-theme-hint-color, #999999);
+            --button: var(--tg-theme-button-color, #007AFF);
+            --button-text: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .container {
+            max-width: 320px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            line-height: 1;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: var(--hint);
+            margin-bottom: 32px;
+            line-height: 1.4;
+        }
+
+        .status {
+            font-size: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .status.info {
+            background: var(--secondary-bg);
+            color: var(--hint);
+            display: block;
+        }
+
+        .status.success {
+            background: #34C75920;
+            color: #34C759;
+            display: block;
+        }
+
+        .status.error {
+            background: #FF3B3020;
+            color: #FF3B30;
+            display: block;
+        }
+
+        .pin-section {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .pin-section.visible {
+            display: block;
+        }
+
+        .pin-label {
+            font-size: 14px;
+            color: var(--hint);
+            margin-bottom: 12px;
+        }
+
+        .pin-inputs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .pin-inputs input {
+            width: 48px;
+            height: 56px;
+            border: 2px solid var(--secondary-bg);
+            border-radius: 12px;
+            background: var(--secondary-bg);
+            color: var(--text);
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .pin-inputs input:focus {
+            border-color: var(--button);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active { opacity: 0.7; }
+        .btn:disabled { opacity: 0.4; cursor: default; }
+
+        .btn-primary {
+            background: var(--button);
+            color: var(--button-text);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-bg);
+            color: var(--text);
+            margin-top: 10px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: var(--hint);
+            font-size: 13px;
+        }
+
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid var(--secondary-bg);
+        }
+
+        .divider span {
+            padding: 0 12px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--button-text);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon" id="icon">🔐</div>
+        <h1 id="title">Verify Identity</h1>
+        <p class="subtitle" id="subtitle">Authenticate to continue your session</p>
+
+        <div class="status" id="status"></div>
+
+        <!-- Biometric button (shown when available) -->
+        <button class="btn btn-primary" id="bioBtn" style="display:none">
+            Verify with Face ID
+        </button>
+
+        <!-- Divider (shown when both options available) -->
+        <div class="divider" id="divider" style="display:none">
+            <span>or</span>
+        </div>
+
+        <!-- PIN fallback -->
+        <div class="pin-section" id="pinSection">
+            <p class="pin-label">Enter your 4-digit PIN</p>
+            <div class="pin-inputs" id="pinInputs">
+                <input type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+                <input type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+                <input type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+                <input type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+            </div>
+            <button class="btn btn-primary" id="pinBtn" disabled>Verify PIN</button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        "use strict";
+
+        // ── Telegram WebApp init ──
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Parse challenge from URL params (bot passes ?challenge=xxx)
+        const params = new URLSearchParams(window.location.search);
+        const challenge = params.get("challenge") || "";
+
+        // ── DOM refs ──
+        const icon = document.getElementById("icon");
+        const title = document.getElementById("title");
+        const subtitle = document.getElementById("subtitle");
+        const status = document.getElementById("status");
+        const bioBtn = document.getElementById("bioBtn");
+        const divider = document.getElementById("divider");
+        const pinSection = document.getElementById("pinSection");
+        const pinBtn = document.getElementById("pinBtn");
+        const pinInputs = document.querySelectorAll("#pinInputs input");
+
+        // ── State ──
+        let bioAvailable = false;
+        let verified = false;
+
+        // ── Helpers ──
+        function setStatus(text, type) {
+            status.textContent = text;
+            status.className = "status " + type;
+        }
+
+        function sendResult(method, data) {
+            if (verified) return;
+            verified = true;
+
+            const payload = JSON.stringify({
+                status: "authenticated",
+                method: method,
+                challenge: challenge,
+                timestamp: Date.now(),
+                ...data
+            });
+
+            // Show success briefly before closing
+            icon.textContent = "✅";
+            title.textContent = "Verified";
+            setStatus("", "");
+            status.style.display = "none";
+
+            setTimeout(function() {
+                tg.sendData(payload);
+            }, 400);
+        }
+
+        function sendFailure(reason) {
+            tg.sendData(JSON.stringify({
+                status: "failed",
+                reason: reason,
+                challenge: challenge,
+                timestamp: Date.now()
+            }));
+        }
+
+        // ── PIN input handling ──
+        pinInputs.forEach(function(input, idx) {
+            input.addEventListener("input", function(e) {
+                var val = e.target.value.replace(/[^0-9]/g, "");
+                e.target.value = val;
+
+                if (val && idx < pinInputs.length - 1) {
+                    pinInputs[idx + 1].focus();
+                }
+
+                // Check if all filled
+                var pin = Array.from(pinInputs).map(function(i) { return i.value; }).join("");
+                pinBtn.disabled = pin.length !== 4;
+            });
+
+            input.addEventListener("keydown", function(e) {
+                if (e.key === "Backspace" && !e.target.value && idx > 0) {
+                    pinInputs[idx - 1].focus();
+                    pinInputs[idx - 1].value = "";
+                }
+            });
+
+            // Prevent paste of non-digits
+            input.addEventListener("paste", function(e) {
+                e.preventDefault();
+                var paste = (e.clipboardData || window.clipboardData).getData("text");
+                var digits = paste.replace(/[^0-9]/g, "").split("");
+                digits.forEach(function(d, i) {
+                    if (pinInputs[idx + i]) {
+                        pinInputs[idx + i].value = d;
+                    }
+                });
+                var pin = Array.from(pinInputs).map(function(i) { return i.value; }).join("");
+                pinBtn.disabled = pin.length !== 4;
+                if (pin.length === 4) pinBtn.focus();
+            });
+        });
+
+        // SHA-256 via Web Crypto API
+        async function sha256(message) {
+            var msgBuffer = new TextEncoder().encode(message);
+            var hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+            var hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
+        }
+
+        pinBtn.addEventListener("click", async function() {
+            var pin = Array.from(pinInputs).map(function(i) { return i.value; }).join("");
+            if (pin.length !== 4 || verified) return;
+
+            pinBtn.disabled = true;
+            pinBtn.innerHTML = '<span class="spinner"></span>Verifying...';
+
+            // Protocol: SHA-256(SHA-256(pin) + challenge)
+            // Step 1: H = SHA-256(pin)  — same as what server stores
+            // Step 2: response = SHA-256(H + challenge)
+            // This way the raw PIN never leaves the client, and the
+            // response is challenge-bound (no replay).
+            var pinHash = await sha256(pin);
+            var response = await sha256(pinHash + challenge);
+            sendResult("pin", { pin_hash: response });
+        });
+
+        // ── Biometric init ──
+        function initBiometric() {
+            var bio = tg.BiometricManager;
+
+            if (!bio) {
+                showPINOnly();
+                return;
+            }
+
+            // Init with timeout (macOS freezes — known bug)
+            var initDone = false;
+            var initTimeout = setTimeout(function() {
+                if (!initDone) {
+                    initDone = true;
+                    showPINOnly();
+                }
+            }, 3000);
+
+            bio.init(function() {
+                if (initDone) return;
+                initDone = true;
+                clearTimeout(initTimeout);
+
+                if (!bio.isBiometricAvailable) {
+                    showPINOnly();
+                    return;
+                }
+
+                // Biometric available — show both options
+                bioAvailable = true;
+                var bioType = bio.biometricType;
+                var label = bioType === "face" ? "Face ID"
+                          : bioType === "finger" ? "Touch ID"
+                          : "Biometric";
+
+                bioBtn.textContent = "Verify with " + label;
+                bioBtn.style.display = "block";
+                divider.style.display = "flex";
+                pinSection.classList.add("visible");
+
+                // Auto-trigger biometric on open (smooth UX)
+                triggerBiometric(bio, label);
+            });
+        }
+
+        function triggerBiometric(bio, label) {
+            setStatus("Requesting " + label + "...", "info");
+
+            // Request access if not yet granted
+            if (!bio.isAccessRequested || !bio.isAccessGranted) {
+                bio.requestAccess({ reason: "Verify your identity for Bridge" }, function(granted) {
+                    if (granted) {
+                        authenticate(bio, label);
+                    } else {
+                        setStatus(label + " access denied. Use PIN instead.", "error");
+                    }
+                });
+            } else {
+                authenticate(bio, label);
+            }
+        }
+
+        function authenticate(bio, label) {
+            bio.authenticate({ reason: "Verify identity for session" }, function(success, token) {
+                if (success) {
+                    sendResult("biometric", {
+                        biometric_type: bio.biometricType,
+                        token: token || ""
+                    });
+                } else {
+                    setStatus(label + " failed. Try again or use PIN.", "error");
+                    bioBtn.disabled = false;
+                }
+            });
+        }
+
+        bioBtn.addEventListener("click", function() {
+            if (verified) return;
+            var bio = tg.BiometricManager;
+            var label = bio.biometricType === "face" ? "Face ID"
+                      : bio.biometricType === "finger" ? "Touch ID"
+                      : "Biometric";
+            triggerBiometric(bio, label);
+        });
+
+        function showPINOnly() {
+            subtitle.textContent = "Enter your PIN to continue";
+            pinSection.classList.add("visible");
+            // Focus first input
+            setTimeout(function() { pinInputs[0].focus(); }, 100);
+        }
+
+        // ── Start ──
+        initBiometric();
+    })();
+    </script>
+</body>
+</html>
